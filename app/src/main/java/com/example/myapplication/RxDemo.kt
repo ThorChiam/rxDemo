@@ -10,6 +10,10 @@ object RxDemo {
 
     const val TAG = "RxDemo"
     const val END_TIME = 10
+    var currentIsInstalled: Boolean = false
+    var shareIsInstalled: Boolean = false
+    var needDownload: Boolean = false
+    var loaded: Boolean = false
     private var downloadSubscriber: Subscriber<in Int>? = null
     private var shareDownloadSubscriber: Subscriber<in Int>? = null
     private var packSubscriber: Subscriber<in Int>? = null
@@ -53,6 +57,7 @@ object RxDemo {
         fun handleInstallSuccess() {
             Log.i(TAG, "flutter Module: install success")
             currentIsInstalled = true
+            init()
             downloadSubscriber?.onCompleted()
         }
 
@@ -180,10 +185,6 @@ object RxDemo {
         }
     }
 
-    var currentIsInstalled: Boolean = false
-
-    var shareIsInstalled: Boolean = false
-
     fun shareDownloadAndInstall(result: String): Observable<Int> = Observable.create { subscriber ->
         Log.e(TAG, "share downloadAndInstall")
         shareDownloadSubscriber = subscriber
@@ -198,111 +199,139 @@ object RxDemo {
         }
     }
 
-    fun downloadAndInstall(result: String): Observable<Int> = Observable.create { topSubscriber ->
-        var sharedProgress = 0
-        var flutterProgress = 0
-        val tasks = ArrayList<Observable<Int>>()
-
-        Log.e(TAG, "flutter downloadAndInstall")
-        if (!shareIsInstalled) {
-            val shareObservable = shareDownloadAndInstall(result)
-            shareObservable
-                .doOnNext { progress ->
-                    Log.e(TAG, "download FlutterShared in progress:${progress}")
-                    sharedProgress = progress
-                    val allProgress = (flutterProgress + sharedProgress) / 2
-                    combineSubscriber?.onNext(allProgress)
-                }
-                .doOnCompleted {
-                    shareIsInstalled = true
-                    sharedProgress = END_TIME
-                    Log.e(TAG, "download FlutterShared completed")
-                    EndTimer1()
-                    if (tasks.count() < 2) {
-                        combineSubscriber?.onCompleted()
-                    }
-                    tasks.remove(shareObservable)
-                }
-                .doOnError { error ->
-                    Log.e(TAG, "download FlutterShared module failed:${error.localizedMessage}")
-                    EndTimer1()
-                    topSubscriber.onError(error)
-                }
-                .subscribe()
-            tasks.add(shareObservable)
-        } else {
-            sharedProgress = END_TIME
-        }
-
-        if (!isInstalled()) {
-            val flutterObservable: Observable<Int> = Observable.create { subscriber ->
-                downloadSubscriber = subscriber
-                prepareToDownload(result)
-            }
-            flutterObservable
-                .doOnNext { progress ->
-                    Log.e(TAG, "download Flutter module in progress:${progress}")
-                    flutterProgress = progress
-                    val allProgress = (flutterProgress + sharedProgress) / 2
-                    combineSubscriber?.onNext(allProgress)
-                }
-                .doOnError { error ->
-                    Log.e(TAG, "download Flutter module failed:${error.localizedMessage}")
-                    EndTimer2()
-                    topSubscriber.onError(error)
-                }
-                .doOnCompleted {
-                    flutterProgress = END_TIME
-                    Log.e(TAG, "download FlutterShared completed")
-                    EndTimer2()
-                    if (tasks.count() < 2) {
-                        combineSubscriber?.onCompleted()
-                    }
-                    tasks.remove(flutterObservable)
-                }
-                .subscribe()
-            tasks.add(flutterObservable)
-        } else {
-            flutterProgress = END_TIME
-        }
-
-        if (tasks.isEmpty()) {
-            loadDynamicModule()
-            topSubscriber.onCompleted()
-        } else {
-            Observable.create<Int> { subscriber ->
-                combineSubscriber = subscriber
-            }.subscribe(
+    fun downloadAndInstall(result: String): Observable<Int> = Observable.create { subscriber ->
+        Observable.concat(downloadAndInstallModules(result), downloadFlutterPackage(result))
+            .subscribe(
                 {
-                    Log.i(TAG, "Flutter in progress:${flutterProgress}")
-                    Log.i(TAG, "Shared in progress:${sharedProgress}")
-                    Log.i(TAG, "download Flutter All in progress (ALL):${it}")
-                    topSubscriber.onNext(it)
+                    Log.d(TAG, "concat:${it}")
+                    if (shareIsInstalled && isInstalled() && needDownload) {
+                        subscriber.onNext((END_TIME + it) / 2)
+                    } else {
+                        subscriber.onNext(it)
+                    }
                 },
                 {
-                    topSubscriber.onError(it)
+                    Log.d(TAG, "concat error:${it}")
+                    subscriber.onError(it)
                 },
                 {
-                    topSubscriber.onCompleted()
+                    Log.d(TAG, "concat completed")
+                    subscriber.onCompleted()
                 }
             )
-        }
 
         return@create
+    }
+
+    fun downloadAndInstallModules(result: String): Observable<Int> =
+        Observable.create { topSubscriber ->
+            var sharedProgress = 0
+            var flutterProgress = 0
+            val tasks = ArrayList<Observable<Int>>()
+
+            Log.e(TAG, "flutter downloadAndInstall")
+            if (!shareIsInstalled) {
+                val shareObservable = shareDownloadAndInstall(result)
+                shareObservable
+                    .doOnNext { progress ->
+                        Log.e(TAG, "download FlutterShared in progress:${progress}")
+                        sharedProgress = progress
+                        val allProgress = (flutterProgress + sharedProgress) / 2
+                        combineSubscriber?.onNext(allProgress)
+                    }
+                    .doOnCompleted {
+                        shareIsInstalled = true
+                        sharedProgress = END_TIME
+                        Log.e(TAG, "download FlutterShared completed")
+                        EndTimer1()
+                        if (tasks.count() < 2) {
+                            combineSubscriber?.onCompleted()
+                        }
+                        tasks.remove(shareObservable)
+                    }
+                    .doOnError { error ->
+                        Log.e(TAG, "download FlutterShared module failed:${error.localizedMessage}")
+                        EndTimer1()
+                        topSubscriber.onError(error)
+                    }
+                    .subscribe()
+                tasks.add(shareObservable)
+            } else {
+                sharedProgress = END_TIME
+            }
+
+            if (!isInstalled()) {
+                val flutterObservable: Observable<Int> = Observable.create { subscriber ->
+                    downloadSubscriber = subscriber
+                    prepareToDownload(result)
+                }
+                flutterObservable
+                    .doOnNext { progress ->
+                        Log.e(TAG, "download Flutter module in progress:${progress}")
+                        flutterProgress = progress
+                        val allProgress = (flutterProgress + sharedProgress) / 2
+                        combineSubscriber?.onNext(allProgress)
+                    }
+                    .doOnError { error ->
+                        Log.e(TAG, "download Flutter module failed:${error.localizedMessage}")
+                        EndTimer2()
+                        topSubscriber.onError(error)
+                    }
+                    .doOnCompleted {
+                        flutterProgress = END_TIME
+                        Log.e(TAG, "download FlutterShared completed")
+                        EndTimer2()
+                        if (tasks.count() < 2) {
+                            combineSubscriber?.onCompleted()
+                        }
+                        tasks.remove(flutterObservable)
+                    }
+                    .subscribe()
+                tasks.add(flutterObservable)
+            } else {
+                flutterProgress = END_TIME
+            }
+
+            if (tasks.isEmpty()) {
+                loadDynamicModule()
+                topSubscriber.onCompleted()
+            } else {
+                Observable.create<Int> { subscriber ->
+                    combineSubscriber = subscriber
+                }.subscribe(
+                    {
+                        Log.i(TAG, "Flutter in progress:${flutterProgress}")
+                        Log.i(TAG, "Shared in progress:${sharedProgress}")
+                        Log.e(TAG, "download Flutter Modules in progress (ALL):${it}")
+                        topSubscriber.onNext(it / 2)
+                    },
+                    {
+                        topSubscriber.onError(it)
+                    },
+                    {
+                        topSubscriber.onCompleted()
+                    }
+                )
+            }
+
+            return@create
 //        if (sharedModuleInstalled && isInstalled) {
 //            subscriber.onCompleted()
 //            return@create
 //        }
-    }
+        }
 
     fun downloadFlutterPackage(result: String): Observable<Int> {
         return Observable.create { subscriber ->
             packSubscriber = subscriber
+            needDownload = result.contains("p")
             Log.e(TAG, "downloadFlutterPackage()")
-            if (result.contains("p")) {
-                StartTimer3()
-            } else {
-                subscriber.onError(NullPointerException())
+            if (isInstalled()) {
+                if (needDownload) {
+                    StartTimer3()
+                } else {
+                    subscriber.onCompleted()
+                }
             }
         }
     }
@@ -314,10 +343,8 @@ object RxDemo {
     fun startWithResult(result: String): Observable<Int> {
         return downloadAndInstall(result)
             .doOnCompleted {
-                Log.i(TAG, "switchToNativeModule - downloadFlutterPack")
-                downloadFlutterPackage(result).doOnCompleted {
-                    EndTimer3()
-                }
+                Log.i(TAG, "downloadAndInstall - doOnCompleted")
+                reset()
             }
     }
 
@@ -331,7 +358,9 @@ object RxDemo {
     }
 
     private fun loadDynamicModule() {
-        Log.e(TAG, "loadDynamicModule()")
-        init()
+        if (!loaded) {
+            loaded = true
+            Log.e(TAG, "loadDynamicModule()")
+        }
     }
 }

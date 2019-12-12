@@ -27,10 +27,12 @@ class MainActivity : AppCompatActivity() {
         bt_test.setOnClickListener {
             RxDemo.startWithResult(result)
                 .doOnNext {
-                    Log.i(RxDemo.TAG, "Main In Progress:${it}")
+                    Log.e(RxDemo.TAG, "Main In Progress:${it}")
+                    progress_Bar.progress = it * 100 / RxDemo.END_TIME
                 }
                 .doOnCompleted {
-                    Log.i(RxDemo.TAG, "result:completed!")
+                    Log.e(RxDemo.TAG, "result:completed!")
+                    progress_Bar.progress = 100
                 }
                 .doOnError {
                     Log.e(RxDemo.TAG, "Main - onError:${it}")
@@ -41,6 +43,7 @@ class MainActivity : AppCompatActivity() {
         bt_reset.setOnClickListener {
             result = ""
             RxDemo.reset()
+            progress_Bar.progress = 0
         }
     }
 
