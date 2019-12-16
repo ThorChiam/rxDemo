@@ -10,8 +10,11 @@ import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.snackbar.Snackbar
 import kotlinx.android.synthetic.main.activity_main.*
 import kotlinx.android.synthetic.main.content_main.*
+import rx.schedulers.Schedulers
 
 class MainActivity : AppCompatActivity() {
+
+    val TAG = "RxDemo:MainActivity"
 
     private var result: String = ""
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -25,24 +28,26 @@ class MainActivity : AppCompatActivity() {
         }
 
         bt_test.setOnClickListener {
-            RxDemo.startWithResult(result)
+            Downloader.download(result)
+                .subscribeOn(Schedulers.io())
+                .subscribeOn(Schedulers.io())
                 .doOnNext {
-                    Log.e(RxDemo.TAG, "Main In Progress:${it}")
-                    progress_Bar.progress = it * 100 / RxDemo.END_TIME
+                    Log.e(TAG, "Main In Progress:${it}")
+                    progress_Bar.progress = it * 100 / EngineModule.END_TIME
                 }
                 .doOnCompleted {
-                    Log.e(RxDemo.TAG, "result:completed!")
+                    Log.e(TAG, "result:completed!")
                     progress_Bar.progress = 100
                 }
                 .doOnError {
-                    Log.e(RxDemo.TAG, "Main - onError:${it}")
+                    Log.e(TAG, "Main - onError:${it}")
                 }
                 .subscribe()
         }
 
         bt_reset.setOnClickListener {
             result = ""
-            RxDemo.reset()
+            EngineModule.reset()
             progress_Bar.progress = 0
         }
     }
