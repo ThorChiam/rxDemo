@@ -18,15 +18,15 @@ object Downloader {
                 .doOnNext {
                     Log.i(TAG, "++++++++ adding AAB:${it}")
                 }
-                .doOnCompleted {
-                    Log.i(TAG, "++++++++ add AAB completed")
-                }
                 .doOnError {
                     Log.e(TAG, "++++++++ downloadAndInstall() failed", it)
                 }
+                .doOnCompleted {
+                    Log.i(TAG, "++++++++ add AAB completed")
+                }
         } else {
             Log.i(TAG, "++++++++ Observable.just(100)")
-            Observable.just(100)
+            Observable.just(END_TIME)
         }.doOnSubscribe {
             Log.i(TAG, "++++++++ doOnSubscribe")
         }
