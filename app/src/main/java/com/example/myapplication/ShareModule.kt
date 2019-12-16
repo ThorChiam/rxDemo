@@ -20,6 +20,7 @@ object ShareModule {
     fun reset() {
         EndTimer()
         shareDownloadSubscriber?.unsubscribe()
+        isInstalled = false
     }
 
     fun prepareToDownload(result: String) {

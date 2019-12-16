@@ -20,6 +20,7 @@ object EngineModule {
     private var timerTask: TimerTask? = null
     private var timerProgress: Int = -1
     private var packDownloader: PackDownloader? = null
+    val taskSubscriptions = ArrayList<Subscription>()
 
     fun init() {
         loadDynamicModule()
@@ -106,7 +107,6 @@ object EngineModule {
         var sharedProgress = 0
         var flutterProgress = 0
         val tasks = ArrayList<Observable<Int>>()
-        val taskSubscriptions = ArrayList<Subscription>()
 
         Log.e(TAG, "flutter downloadAndInstall")
         if (!ShareModule.isInstalled) {
@@ -118,6 +118,10 @@ object EngineModule {
                     val allProgress = (flutterProgress + sharedProgress) / 2
                     combineSubscriber?.onNext(allProgress)
                 }
+                .doOnError { error ->
+                    Log.e(TAG, "download FlutterShared module failed", error)
+                    topSubscriber.onError(error)
+                }
                 .doOnCompleted {
                     sharedProgress = END_TIME
                     Log.e(TAG, "download FlutterShared completed")
@@ -126,17 +130,13 @@ object EngineModule {
                     }
                     tasks.remove(shareObservable)
                 }
-                .doOnError { error ->
-                    Log.e(TAG, "download FlutterShared module failed", error)
-                    topSubscriber.onError(error)
-                }
                 .subscribe())
             tasks.add(shareObservable)
         } else {
             sharedProgress = END_TIME
         }
 
-        if (!isInstalled()) {
+        if (!currentIsInstalled) {
             val flutterObservable: Observable<Int> = Observable.create { subscriber ->
                 downloadSubscriber = subscriber
                 prepareToDownload(result)
@@ -151,7 +151,7 @@ object EngineModule {
                 .doOnError { error ->
                     Log.e(TAG, "download Flutter module failed", error)
                     EndTimer2()
-                    topSubscriber.onError(error)
+                    combineSubscriber?.onError(error)
                 }
                 .doOnCompleted {
                     flutterProgress = END_TIME
@@ -170,13 +170,11 @@ object EngineModule {
 
         if (tasks.isEmpty()) {
             loadDynamicModule()
+            taskSubscriptions.add(downloadPackage(result, topSubscriber))
             topSubscriber.onCompleted()
         } else {
             Observable.create<Int> { subscriber ->
                 combineSubscriber = subscriber
-//                    for (task in tasks) {
-//                        taskSubscriptions.add(task.subscribe())
-//                    }
             }.subscribe(
                 {
                     Log.i(TAG, "Flutter in progress:${flutterProgress}")
@@ -189,32 +187,36 @@ object EngineModule {
                     unsubscribeTasks(taskSubscriptions)
                 },
                 {
-                    taskSubscriptions.add(downloadFlutterPackage(result)
-                        .subscribe(
-                            {
-                                Log.d(TAG, "downloadFlutterPackage:${it}")
-                                if (ShareModule.isInstalled && isInstalled() && needDownload) {
-                                    topSubscriber.onNext((END_TIME + it) / 2)
-                                } else {
-                                    topSubscriber.onNext(it)
-                                }
-                            },
-                            {
-                                Log.d(TAG, "downloadFlutterPackage error:${it}")
-                                topSubscriber.onError(it)
-                                unsubscribeTasks(taskSubscriptions)
-                            },
-                            {
-                                Log.d(TAG, "downloadFlutterPackage completed")
-                                topSubscriber.onCompleted()
-                                unsubscribeTasks(taskSubscriptions)
-                            }
-                        ))
+                    taskSubscriptions.add(downloadPackage(result, topSubscriber))
                 }
             )
         }
 
         return@create
+    }
+
+    private fun downloadPackage(result: String, topSubscriber: Subscriber<in Int>): Subscription {
+        return downloadFlutterPackage(result)
+            .subscribe(
+                {
+                    Log.d(TAG, "downloadFlutterPackage:${it}")
+                    if (ShareModule.isInstalled && currentIsInstalled && needDownload) {
+                        topSubscriber.onNext((END_TIME + it) / 2)
+                    } else {
+                        topSubscriber.onNext(it)
+                    }
+                },
+                {
+                    Log.d(TAG, "downloadFlutterPackage error:${it}")
+                    topSubscriber.onError(it)
+                    unsubscribeTasks(taskSubscriptions)
+                },
+                {
+                    Log.d(TAG, "downloadFlutterPackage completed")
+                    topSubscriber.onCompleted()
+                    unsubscribeTasks(taskSubscriptions)
+                }
+            )
     }
 
     private fun unsubscribeTasks(taskSubscriptions: ArrayList<Subscription>) {
@@ -233,7 +235,7 @@ object EngineModule {
             return if (needDownload && packDownloader != null) {
                 packDownloader!!.downloadPacks()
             } else {
-                Observable.just(100)
+                Observable.just(END_TIME)
             }
         } else {
             Observable.create { subscriber ->
@@ -248,6 +250,9 @@ object EngineModule {
         PackDownloader.reset()
         EndTimer2()
         downloadSubscriber?.unsubscribe()
+        currentIsInstalled = false
+        loaded = false
+        packDownloader = null
     }
 
     private fun loadDynamicModule() {

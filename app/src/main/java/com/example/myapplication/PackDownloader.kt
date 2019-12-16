@@ -17,7 +17,6 @@ object PackDownloader {
     fun reset() {
         EndTimer()
         packSubscriber?.unsubscribe()
-
     }
 
     fun downloadPacks(): Observable<Int> = Observable.create { subscriber ->
