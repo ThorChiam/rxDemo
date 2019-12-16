@@ -47,6 +47,9 @@ class MainActivity : AppCompatActivity() {
 
         bt_reset.setOnClickListener {
             result = ""
+            cb_flutter.isChecked = false
+            cb_pack.isChecked = false
+            cb_shared.isChecked = false
             EngineModule.reset()
             progress_Bar.progress = 0
         }
