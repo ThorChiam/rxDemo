@@ -33,7 +33,7 @@ class MainActivity : AppCompatActivity() {
                 .subscribeOn(Schedulers.io())
                 .doOnNext {
                     Log.e(TAG, "Main In Progress:${it}")
-                    progress_Bar.progress = it * 100 / EngineModule.END_TIME
+                    progress_Bar.progress = it * 100 / Downloader.END_TIME
                 }
                 .doOnCompleted {
                     Log.e(TAG, "result:completed!")

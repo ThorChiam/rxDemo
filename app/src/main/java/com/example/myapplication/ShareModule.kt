@@ -1,6 +1,7 @@
 package com.example.myapplication
 
 import android.util.Log
+import com.example.myapplication.Downloader.END_TIME
 import rx.Observable
 import rx.Subscriber
 import java.util.*
@@ -8,7 +9,6 @@ import java.util.*
 object ShareModule {
 
     const val TAG = "RxDemo:ShareModule"
-    const val END_TIME = 10
     private var timer1: Timer? = null
     private var timerTask1: TimerTask? = null
     private var timerProgress1: Int = -2
