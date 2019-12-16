@@ -48,5 +48,6 @@ object PackDownloader {
         timerTask?.cancel()
         timer = null
         timerTask = null
+        timerProgress = 0
     }
 }

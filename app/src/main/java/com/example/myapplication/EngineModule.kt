@@ -253,6 +253,7 @@ object EngineModule {
         currentIsInstalled = false
         loaded = false
         packDownloader = null
+        timerProgress = 0
     }
 
     private fun loadDynamicModule() {

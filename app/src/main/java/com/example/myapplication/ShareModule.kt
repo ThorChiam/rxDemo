@@ -9,9 +9,9 @@ import java.util.*
 object ShareModule {
 
     const val TAG = "RxDemo:ShareModule"
-    private var timer1: Timer? = null
-    private var timerTask1: TimerTask? = null
-    private var timerProgress1: Int = -2
+    private var timer: Timer? = null
+    private var timerTask: TimerTask? = null
+    private var timerProgress: Int = -2
     private var shareDownloadSubscriber: Subscriber<in Int>? = null
 
     var isInstalled: Boolean = false
@@ -75,27 +75,28 @@ object ShareModule {
     }
 
     private fun StartTimer() {
-        if (timer1 == null && timerTask1 == null) {
-            timer1 = Timer()
-            timerTask1 = object : TimerTask() {
+        if (timer == null && timerTask == null) {
+            timer = Timer()
+            timerTask = object : TimerTask() {
                 override fun run() {
-                    timerProgress1++
-                    if (timerProgress1 >= END_TIME) {
+                    timerProgress++
+                    if (timerProgress >= END_TIME) {
                         shareDownloadCallBack.handleInstallSuccess()
                     } else {
-                        shareDownloadCallBack.handleDownloading(timerProgress1)
+                        shareDownloadCallBack.handleDownloading(timerProgress)
                     }
 
                 }
             }
-            timer1?.schedule(timerTask1, 5000, 1000)
+            timer?.schedule(timerTask, 5000, 1000)
         }
     }
 
     private fun EndTimer() {
-        timer1?.cancel()
-        timerTask1?.cancel()
-        timer1 = null
-        timerTask1 = null
+        timer?.cancel()
+        timerTask?.cancel()
+        timer = null
+        timerTask = null
+        timerProgress = 0
     }
 }
