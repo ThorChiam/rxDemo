@@ -112,25 +112,26 @@ object EngineModule {
         if (!ShareModule.isInstalled) {
             val shareObservable = ShareModule.downloadAndInstall(result)
             taskSubscriptions.add(shareObservable
-                .doOnNext { progress ->
-                    Log.e(TAG, "download FlutterShared in progress:${progress}")
-                    sharedProgress = progress
-                    val allProgress = (flutterProgress + sharedProgress) / 2
-                    combineSubscriber?.onNext(allProgress)
-                }
-                .doOnError { error ->
-                    Log.e(TAG, "download FlutterShared module failed", error)
-                    topSubscriber.onError(error)
-                }
-                .doOnCompleted {
-                    sharedProgress = END_TIME
-                    Log.e(TAG, "download FlutterShared completed")
-                    if (tasks.count() < 2) {
-                        combineSubscriber?.onCompleted()
+                .subscribe(
+                    { progress ->
+                        Log.e(TAG, "download FlutterShared in progress:${progress}")
+                        sharedProgress = progress
+                        val allProgress = (flutterProgress + sharedProgress) / 2
+                        combineSubscriber?.onNext(allProgress)
+                    },
+                    { error ->
+                        Log.e(TAG, "download FlutterShared module failed", error)
+                        topSubscriber.onError(error)
+                    },
+                    {
+                        sharedProgress = END_TIME
+                        Log.e(TAG, "download FlutterShared completed")
+                        if (tasks.count() < 2) {
+                            combineSubscriber?.onCompleted()
+                        }
+                        tasks.remove(shareObservable)
                     }
-                    tasks.remove(shareObservable)
-                }
-                .subscribe())
+                ))
             tasks.add(shareObservable)
         } else {
             sharedProgress = END_TIME
@@ -142,27 +143,28 @@ object EngineModule {
                 prepareToDownload(result)
             }
             taskSubscriptions.add(flutterObservable
-                .doOnNext { progress ->
-                    Log.e(TAG, "download Flutter module in progress:${progress}")
-                    flutterProgress = progress
-                    val allProgress = (flutterProgress + sharedProgress) / 2
-                    combineSubscriber?.onNext(allProgress)
-                }
-                .doOnError { error ->
-                    Log.e(TAG, "download Flutter module failed", error)
-                    EndTimer2()
-                    combineSubscriber?.onError(error)
-                }
-                .doOnCompleted {
-                    flutterProgress = END_TIME
-                    Log.e(TAG, "download Flutter module completed")
-                    EndTimer2()
-                    if (tasks.count() < 2) {
-                        combineSubscriber?.onCompleted()
+                .subscribe(
+                    { progress ->
+                        Log.e(TAG, "download Flutter module in progress:${progress}")
+                        flutterProgress = progress
+                        val allProgress = (flutterProgress + sharedProgress) / 2
+                        combineSubscriber?.onNext(allProgress)
+                    },
+                    { error ->
+                        Log.e(TAG, "download Flutter module failed", error)
+                        EndTimer2()
+                        combineSubscriber?.onError(error)
+                    },
+                    {
+                        flutterProgress = END_TIME
+                        Log.e(TAG, "download Flutter module completed")
+                        EndTimer2()
+                        if (tasks.count() < 2) {
+                            combineSubscriber?.onCompleted()
+                        }
+                        tasks.remove(flutterObservable)
                     }
-                    tasks.remove(flutterObservable)
-                }
-                .subscribe())
+                ))
             tasks.add(flutterObservable)
         } else {
             flutterProgress = END_TIME
