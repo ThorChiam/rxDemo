@@ -96,7 +96,9 @@ object EngineModule {
         if (result.contains("f")) {
             StartTimer2()
         } else {
-            downloadCallBack.handleInstallFail(IndexOutOfBoundsException())
+//            downloadCallBack.handleInstallFail(IndexOutOfBoundsException())
+            currentIsInstalled = true
+            packDownloader = PackDownloader
         }
     }
 
@@ -107,6 +109,15 @@ object EngineModule {
         var sharedProgress = 0
         var flutterProgress = 0
         val tasks = ArrayList<Observable<Int>>()
+
+        if (!result.contains("f")) {
+            currentIsInstalled = true
+            packDownloader = PackDownloader
+        }
+
+        if (!result.contains("s")) {
+            ShareModule.isInstalled = true
+        }
 
         Log.e(TAG, "flutter downloadAndInstall")
         if (!ShareModule.isInstalled) {
@@ -173,7 +184,6 @@ object EngineModule {
         if (tasks.isEmpty()) {
             loadDynamicModule()
             taskSubscriptions.add(downloadPackage(result, topSubscriber))
-            topSubscriber.onCompleted()
         } else {
             Observable.create<Int> { subscriber ->
                 combineSubscriber = subscriber
@@ -202,7 +212,8 @@ object EngineModule {
             .subscribe(
                 {
                     Log.d(TAG, "downloadFlutterPackage:${it}")
-                    if (ShareModule.isInstalled && currentIsInstalled && needDownload) {
+                    Log.d(TAG, "taskSubscriptions.count():${taskSubscriptions.count()}")
+                    if (taskSubscriptions.count() > 1) {
                         topSubscriber.onNext((END_TIME + it) / 2)
                     } else {
                         topSubscriber.onNext(it)
@@ -227,6 +238,7 @@ object EngineModule {
                 subscription.unsubscribe()
             }
         }
+        taskSubscriptions.clear()
     }
 
     fun downloadFlutterPackage(result: String): Observable<Int> {

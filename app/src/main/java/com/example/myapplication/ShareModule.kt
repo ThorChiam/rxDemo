@@ -28,7 +28,8 @@ object ShareModule {
         if (result.contains("s")) {
             StartTimer()
         } else {
-            shareDownloadCallBack.handleInstallFail(NoClassDefFoundError())
+//            shareDownloadCallBack.handleInstallFail(NoClassDefFoundError())
+            isInstalled = true
         }
     }
 
